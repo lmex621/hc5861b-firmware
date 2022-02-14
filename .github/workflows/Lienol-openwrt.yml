@@ -48,7 +48,7 @@ jobs:
     - name: Clone source code
       env: 
         REPO_URL: https://github.com/Lienol/openwrt
-        REPO_BRANCH: 19.07
+        REPO_BRANCH: 21.02
       run: git clone -b $REPO_BRANCH --single-branch $REPO_URL openwrt
 
     - name: Enable SSR Plus
@@ -74,9 +74,6 @@ jobs:
         cd openwrt
         ../$DIY_SH
         make defconfig
-    - name: SSH connection to Actions
-      uses: P3TERX/debugger-action@main
-      if: env.SSH_ACTIONS == 'true'
 
     - name: Download package
       id: package

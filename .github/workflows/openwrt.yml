@@ -6,7 +6,7 @@
 # Blog: https://p3terx.com
 #=================================================
 
-name: Build OpenWrt
+name: Build openwrt //
 
 on:
   release:
@@ -15,11 +15,12 @@ on:
     branches:
       - master
     paths:
-      - '.config'
+      - 'openwrt.config'
   schedule:
     - cron: 0 8 * * *
   watch:
     types: [started]
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,7 +34,7 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev libz-dev patch unzip zlib1g-dev lib32gcc1 libc6-dev-i386 subversion flex uglifyjs git-core gcc-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx libelf-dev autoconf automake libtool autopoint device-tree-compiler
+        sudo -E apt-get -qq install  build-essential asciidoc binutils bzip2 curl gawk gettext git libncurses5-dev libz-dev patch python3.5 python2.7 unzip zlib1g-dev lib32gcc1 libc6-dev-i386 subversion flex uglifyjs git-core gcc-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx libelf-dev autoconf automake libtool autopoint device-tree-compiler g++-multilib antlr3 gperf
     - name: Free up disk space
       if: env.FREE_UP_DISK == 'true'
       env:
@@ -46,53 +47,55 @@ jobs:
         sudo -E apt-get -qq clean
     - name: Clone source code
       env: 
-        REPO_URL: https://github.com/coolsnowwolf/lede
-        REPO_BRANCH: master
-      run: git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
-
+        REPO_URL: https://git.openwrt.org/openwrt/openwrt.git
+      run: git clone $REPO_URL openwrt
+      
     - name: Enable SSR Plus
-      run: cd openwrt && sed -i 's/#src-git helloworld/src-git helloworld/g' ./feeds.conf.default
-
+      run: cd openwrt && echo 'src-git helloworld https://github.com/fw876/helloworld' >> feeds.conf.default
+      
     - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
 
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
       
-#    - name: SSH connection to Actions
- #     uses: P3TERX/debugger-action@main     
+ #   - name: SSH connection to Actions
+  #    uses: P3TERX/debugger-action@main
 
     - name: Load custom configuration
       env:
-        CONFIG_FILE: '.config'
+        CONFIG_FILE: 'openwrt.config'
         DIY_SH: diy.sh
-        THEME_A: theme-a-lean.sh
       run: |
         [ -e files ] && mv files openwrt/files
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
         chmod +x $DIY_SH
-        chmod +x $THEME_A
         cd openwrt
-        ../$THEME_A
         ../$DIY_SH
         make defconfig
-    - name: Setup Debug Session
-      uses: csexton/debugger-action@master    
+
     - name: Download package
       id: package
       run: |
         cd openwrt
-        make defconfig
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-    - name: Build
+    - name: Compile the firmware
+      id: compile
       run: |
         cd openwrt
-        echo -e "$(nproc) thread build."
-        make -j$(nproc) V=s
+        echo -e "$(nproc) thread compile"
+        make -j$(nproc) || make -j1 V=s
+        echo "::set-output name=status::success"
+    - name : Upload packages
+      uses: actions/upload-artifact@master
+      with:
+        name: OpenWrt packages
+        path: openwrt/bin/packages
+
     - name : Upload targets
       uses: actions/upload-artifact@master
       with:
-        name: OpenWrt firmware
+        name: OpenWrt hc5861b offical firmware
         path: openwrt/bin/targets
